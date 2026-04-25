@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: ecom_postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: ecom_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/01_source.sql:/docker-entrypoint-initdb.d/01_source.sql
+      - ./sql/02_staging.sql:/docker-entrypoint-initdb.d/02_staging.sql
+      - ./sql/03_warehouse.sql:/docker-entrypoint-initdb.d/03_warehouse.sql
+      - ./sql/04_marts.sql:/docker-entrypoint-initdb.d/04_marts.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d ecom_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow:
+    build: .
+    container_name: ecom_airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/ecom_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+      DB_HOST: postgres
+      DB_NAME: ecom_db
+      DB_USER: airflow
+      DB_PASSWORD: airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - airflow_logs:/opt/airflow/logs
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname User
+          --role Admin
+          --email admin@ecom.local &&
+        airflow webserver &
+        airflow scheduler
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+  airflow_logs:
