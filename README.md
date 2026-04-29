@@ -70,7 +70,7 @@ ecom-pipeline/
 ### 1. Clone & start
 
 ```bash
-git clone https://github.com/yourusername/ecom-pipeline.git
+git clone https://github.com/senthong/ecom-pipeline.git
 cd ecom-pipeline
 docker-compose up --build -d
 ```
