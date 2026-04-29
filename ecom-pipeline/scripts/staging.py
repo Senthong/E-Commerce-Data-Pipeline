@@ -20,8 +20,8 @@ def _age_group(age_col: str) -> str:
 
 
 def stage_customers(cur, run_date: date):
-    cur.execute(
-        f"""
+    age_group_sql = _age_group('age')
+    sql = f"""
         INSERT INTO stg_customers
             (customer_id, full_name, email, city, age, age_group, is_valid, invalid_reason)
         SELECT
@@ -30,7 +30,7 @@ def stage_customers(cur, run_date: date):
             LOWER(TRIM(email)),
             city,
             age,
-            {_age_group('age')},
+            {age_group_sql},
             CASE
                 WHEN full_name IS NULL OR TRIM(full_name) = '' THEN FALSE
                 WHEN email NOT LIKE '%@%'                       THEN FALSE
@@ -44,12 +44,10 @@ def stage_customers(cur, run_date: date):
                 ELSE NULL
             END
         FROM raw_customers
-        WHERE created_at::date = %s
+        WHERE created_at::date = %(run_date)s
         ON CONFLICT (customer_id) DO NOTHING
-        """,
-        (run_date,),
-    )
-    print(f"  [staging] customers staged for {run_date}: {cur.rowcount} rows")
+    """
+    cur.execute(sql, {"run_date": run_date})
 
 
 def stage_products(cur, run_date: date):
