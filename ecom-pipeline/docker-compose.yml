@@ -44,16 +44,10 @@ services:
       - airflow_logs:/opt/airflow/logs
     ports:
       - "8080:8080"
-    command: >
+    command: |
       bash -c "
         airflow db init &&
-        airflow users create
-          --username admin
-          --password admin
-          --firstname Admin
-          --lastname User
-          --role Admin
-          --email admin@ecom.local &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@ecom.local || true &&
         airflow webserver &
         airflow scheduler
       "
