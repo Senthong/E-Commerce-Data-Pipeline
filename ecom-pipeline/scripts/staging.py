@@ -26,33 +26,33 @@ def stage_customers(cur, run_date: date):
             (customer_id, full_name, email, city, age, age_group, is_valid, invalid_reason)
         SELECT
             customer_id,
-            TRIM(full_name),
-            LOWER(TRIM(email)),
+            TRIM(full_name) AS full_name,
+            LOWER(TRIM(email)) AS email,
             city,
             age,
-            {age_group_sql},
+            {age_group_sql} AS age_group,
             CASE
                 WHEN full_name IS NULL OR TRIM(full_name) = '' THEN FALSE
-                WHEN email NOT LIKE '%@%'                       THEN FALSE
-                WHEN age < 16 OR age > 100                      THEN FALSE
+                WHEN email NOT LIKE '%%@%%' THEN FALSE
+                WHEN age < 16 OR age > 100 THEN FALSE
                 ELSE TRUE
-            END,
+            END AS is_valid,
             CASE
-                WHEN full_name IS NULL OR TRIM(full_name) = '' THEN 'Missing name'
-                WHEN email NOT LIKE '%@%'                       THEN 'Invalid email'
-                WHEN age < 16 OR age > 100                      THEN 'Invalid age'
+                WHEN full_name IS NULL OR TRIM(full_name) = '' THEN 'Missing or empty full name'
+                WHEN email NOT LIKE '%%@%%' THEN 'Invalid email format'
+                WHEN age < 16 OR age > 100 THEN 'Age out of range (16-100)'
                 ELSE NULL
-            END
+            END AS invalid_reason
         FROM raw_customers
-        WHERE created_at::date = %(run_date)s
+        WHERE created_at::date = %s
         ON CONFLICT (customer_id) DO NOTHING
     """
-    cur.execute(sql, {"run_date": run_date})
+    cur.execute(sql, (run_date,))
+    print(f"  [staging] customers staged for {run_date}: {cur.rowcount} rows")
 
 
 def stage_products(cur, run_date: date):
-    cur.execute(
-        """
+    sql = """
         INSERT INTO stg_products
             (product_id, name, category, cost_price, sell_price, margin_pct, is_valid, invalid_reason)
         SELECT
@@ -77,15 +77,13 @@ def stage_products(cur, run_date: date):
         FROM raw_products
         WHERE created_at::date = %s
         ON CONFLICT (product_id) DO NOTHING
-        """,
-        (run_date,),
-    )
+    """
+    cur.execute(sql, (run_date,))
     print(f"  [staging] products staged for {run_date}: {cur.rowcount} rows")
 
 
 def stage_orders(cur, run_date: date):
-    cur.execute(
-        """
+    sql = """
         INSERT INTO stg_orders
             (order_id, customer_id, product_id, quantity, unit_price,
              total_amount, status, order_date, is_valid, invalid_reason)
@@ -119,9 +117,8 @@ def stage_orders(cur, run_date: date):
         LEFT JOIN raw_products  p ON o.product_id  = p.product_id
         WHERE o.created_at::date = %s
         ON CONFLICT (order_id) DO NOTHING
-        """,
-        (run_date,),
-    )
+    """
+    cur.execute(sql, (run_date,))
     print(f"  [staging] orders staged for {run_date}: {cur.rowcount} rows")
 
 
